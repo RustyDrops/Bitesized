@@ -1,6 +1,7 @@
 
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { Depth, LearningMode, LearningPlan } from "../types";
+import { getCachedAudio, setCachedAudio } from "./cacheService";
 
 let ai: GoogleGenAI | null = null;
 
@@ -206,20 +207,54 @@ export const generateLearningPlan = async (
   return plan;
 };
 
+const hashText = async (text: string): Promise<string> => {
+  const msgUint8 = new TextEncoder().encode(text);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+};
+
 export const getLessonAudio = async (text: string): Promise<string | undefined> => {
-  const response = await getAi().models.generateContent({
-    model: "gemini-2.5-flash-preview-tts",
-    contents: [{ parts: [{ text: `Please read this lesson bite content clearly: ${text}` }] }],
-    config: {
-      responseModalities: [Modality.AUDIO],
-      speechConfig: {
-        voiceConfig: {
-          prebuiltVoiceConfig: { voiceName: 'Kore' },
+  let cacheKey: string | null = null;
+  try {
+    cacheKey = await hashText(text);
+    const cachedAudio = await getCachedAudio(cacheKey);
+    if (cachedAudio) {
+      return cachedAudio;
+    }
+  } catch (error) {
+    console.warn("Cache lookup failed, proceeding to API:", error);
+  }
+
+  try {
+    const response = await getAi().models.generateContent({
+      model: "gemini-2.5-flash-preview-tts",
+      contents: [{ parts: [{ text: `Please read this lesson bite content clearly: ${text}` }] }],
+      config: {
+        responseModalities: [Modality.AUDIO],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: { voiceName: 'Kore' },
+          },
         },
       },
-    },
-  });
-  return response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+    });
+
+    const audioData = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+
+    if (audioData && cacheKey) {
+      try {
+        await setCachedAudio(cacheKey, audioData);
+      } catch (error) {
+        console.warn("Failed to cache audio:", error);
+      }
+    }
+
+    return audioData;
+  } catch (error) {
+    console.error("Error generating audio:", error);
+    throw error;
+  }
 };
 
 export const askBiteQuestion = async (topic: string, biteContent: string, question: string): Promise<string> => {
