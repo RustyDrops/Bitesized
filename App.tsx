@@ -147,6 +147,8 @@ const App: React.FC = () => {
       onLogout={handleLogout} 
       onHome={() => setView('plans-list')}
       onProfile={() => setView('profile')}
+      hideHeader={view === 'bite' || view === 'quiz'}
+      hideFooter={view === 'bite' || view === 'quiz'}
     >
       {view === 'plans-list' && (
         <PlanList 
