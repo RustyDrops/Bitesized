@@ -2,7 +2,18 @@
 import { GoogleGenAI, Type, Modality } from "@google/genai";
 import { Depth, LearningMode, LearningPlan } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+let ai: GoogleGenAI | null = null;
+
+const getAi = () => {
+  if (!ai) {
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error("VITE_GEMINI_API_KEY is not set in environment variables");
+    }
+    ai = new GoogleGenAI({ apiKey });
+  }
+  return ai;
+};
 
 export const generateLearningPlan = async (
   topic: string,
@@ -128,7 +139,7 @@ export const generateLearningPlan = async (
     required: ["topic", "bites", "quiz"],
   };
 
-  const result = await ai.models.generateContent({
+  const result = await getAi().models.generateContent({
     model,
     contents: prompt,
     config: {
@@ -137,7 +148,18 @@ export const generateLearningPlan = async (
     },
   });
 
-  const rawJson = JSON.parse(result.text);
+  if (!result.text) {
+    throw new Error("No content generated");
+  }
+
+  let rawJson;
+  try {
+    rawJson = JSON.parse(result.text);
+  } catch (error) {
+    console.error("Failed to parse JSON response:", result.text);
+    throw new Error("Invalid JSON response from AI");
+  }
+
   const avgBiteTime = 7;
   const bitesPerDay = Math.max(1, Math.min(5, Math.floor(dailyTime / avgBiteTime)));
 
@@ -156,7 +178,7 @@ export const generateLearningPlan = async (
 };
 
 export const getLessonAudio = async (text: string): Promise<string | undefined> => {
-  const response = await ai.models.generateContent({
+  const response = await getAi().models.generateContent({
     model: "gemini-2.5-flash-preview-tts",
     contents: [{ parts: [{ text: `Please read this lesson bite content clearly: ${text}` }] }],
     config: {
@@ -172,7 +194,7 @@ export const getLessonAudio = async (text: string): Promise<string | undefined> 
 };
 
 export const askBiteQuestion = async (topic: string, biteContent: string, question: string): Promise<string> => {
-  const result = await ai.models.generateContent({
+  const result = await getAi().models.generateContent({
     model: 'gemini-3-flash-preview',
     contents: `You are a microlearning tutor for the topic "${topic}".
     The current lesson content is: "${biteContent}".

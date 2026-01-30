@@ -33,7 +33,13 @@ const App: React.FC = () => {
     const savedPlans = localStorage.getItem('bsl_plans');
     const savedActivePlanId = localStorage.getItem('bsl_active_plan_id');
 
-    const plans = savedPlans ? JSON.parse(savedPlans) : [];
+    let plans = [];
+    try {
+      plans = savedPlans ? JSON.parse(savedPlans) : [];
+    } catch (error) {
+      console.error("Failed to parse saved plans:", error);
+      localStorage.removeItem('bsl_plans');
+    }
     const activePlanId = savedActivePlanId;
 
     setState(prev => ({
@@ -50,7 +56,8 @@ const App: React.FC = () => {
   }, []);
 
   const handleLogout = () => {
-    localStorage.clear();
+    localStorage.removeItem('bsl_plans');
+    localStorage.removeItem('bsl_active_plan_id');
     setState({
       user: GUEST_USER,
       plans: [],
