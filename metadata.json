@@ -1,0 +1,7 @@
+{
+  "name": "Bite Sized Learning",
+  "description": "A microlearning app that transforms any topic into structured, practical, and highly digestible lessons inspired by the Google Primer style, powered by Gemini 3 Flash.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}
