@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { LearningPlan, Depth } from '../types';
 
 interface DashboardProps {
@@ -18,21 +18,21 @@ const formatTime = (seconds: number) => {
 };
 
 const Dashboard: React.FC<DashboardProps> = ({ plan, onOpenBite, onBack, onStartQuiz, onViewBadge }) => {
-  const completedCount = plan.bites.filter(b => b.completed).length;
+  const completedBites = useMemo(() => plan.bites.filter(b => b.completed), [plan.bites]);
+  const completedCount = completedBites.length;
   const progressPercent = Math.round((completedCount / plan.totalBites) * 100);
   const isComplete = progressPercent === 100;
 
   // Analytics
   const totalTimeSpent = plan.bites.reduce((acc, bite) => acc + (bite.timeSpentSeconds || 0), 0);
-  const completedBites = plan.bites.filter(b => b.completed);
   const avgTimePerBite = completedBites.length > 0 
     ? Math.round(totalTimeSpent / completedBites.length) 
     : 0;
 
   // Find completion trend (e.g., fastest bite)
-  const fastestBite = completedBites.length > 0 
+  const fastestBite = useMemo(() => completedBites.length > 0
     ? [...completedBites].sort((a, b) => (a.timeSpentSeconds || Infinity) - (b.timeSpentSeconds || Infinity))[0]
-    : null;
+    : null, [completedBites]);
 
   const handleShare = () => {
     const summary = `Current learning: ${plan.topic} (${plan.depth})\nProgress: ${progressPercent}%\nTotal learning time: ${formatTime(totalTimeSpent)}\nCreated via Bite Sized Learning 🧠`;
