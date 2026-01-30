@@ -22,7 +22,9 @@ const BiteViewer: React.FC<BiteViewerProps> = ({ plan, biteId, onBack, onComplet
   const [quizStep, setQuizStep] = useState(0);
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [quizCompleted, setQuizCompleted] = useState(false);
+  const [quizError, setQuizError] = useState<string | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const audioCacheRef = useRef<Record<string, string>>({});
   
   const startTimeRef = useRef<number>(Date.now());
 
@@ -36,6 +38,7 @@ const BiteViewer: React.FC<BiteViewerProps> = ({ plan, biteId, onBack, onComplet
     setShowQuiz(false);
     setQuizStep(0);
     setSelectedOption(null);
+    setQuizError(null);
     setQuizCompleted(!!bite?.completed);
 
     return () => {
@@ -71,10 +74,12 @@ const BiteViewer: React.FC<BiteViewerProps> = ({ plan, biteId, onBack, onComplet
     
     const isCorrect = selectedOption === bite.miniQuiz[quizStep].correctIndex;
     if (!isCorrect) {
-      alert("Not quite! Take another look at the lesson content.");
+      setQuizError("Not quite! Take another look at the lesson content.");
       setSelectedOption(null);
       return;
     }
+
+    setQuizError(null);
 
     if (quizStep < bite.miniQuiz.length - 1) {
       setQuizStep(prev => prev + 1);
@@ -119,10 +124,26 @@ const BiteViewer: React.FC<BiteViewerProps> = ({ plan, biteId, onBack, onComplet
   const handleReadAloud = async () => {
     if (isPlaying) { stopAudio(); return; }
     setIsPlaying(true);
+
+    // Check cache first
+    if (audioCacheRef.current[bite.id]) {
+      playAudio(audioCacheRef.current[bite.id]);
+      return;
+    }
+
     const textToRead = `${bite.title}. ${bite.content.setup}. ${bite.content.explanation}. Analogy: ${bite.content.analogy}. Key Takeaway: ${bite.content.takeaway}`;
     try {
       const base64Audio = await getLessonAudio(textToRead);
       if (!base64Audio) { setIsPlaying(false); return; }
+
+      // Cache it
+      audioCacheRef.current[bite.id] = base64Audio;
+      playAudio(base64Audio);
+    } catch (e) { console.error("Audio error:", e); setIsPlaying(false); }
+  };
+
+  const playAudio = async (base64Audio: string) => {
+    try {
       audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
       const audioBuffer = await decodeAudioData(decode(base64Audio), audioContextRef.current, 24000, 1);
       const source = audioContextRef.current.createBufferSource();
@@ -130,7 +151,7 @@ const BiteViewer: React.FC<BiteViewerProps> = ({ plan, biteId, onBack, onComplet
       source.connect(audioContextRef.current.destination);
       source.onended = () => setIsPlaying(false);
       source.start();
-    } catch (e) { console.error("Audio error:", e); setIsPlaying(false); }
+    } catch (e) { console.error("Audio playback error:", e); setIsPlaying(false); }
   };
 
   return (
@@ -220,13 +241,22 @@ const BiteViewer: React.FC<BiteViewerProps> = ({ plan, biteId, onBack, onComplet
             {bite.miniQuiz[quizStep].options.map((opt, idx) => (
               <button
                 key={idx}
-                onClick={() => setSelectedOption(idx)}
+                onClick={() => {
+                  setSelectedOption(idx);
+                  setQuizError(null);
+                }}
                 className={`w-full text-left p-5 rounded-2xl border-2 transition-all font-medium ${selectedOption === idx ? 'border-blue-600 bg-blue-50 text-blue-900 shadow-md scale-[1.02]' : 'border-white bg-white text-slate-600 shadow-sm hover:border-slate-100'}`}
               >
                 {opt}
               </button>
             ))}
           </div>
+          {quizError && (
+             <div className="bg-red-50 text-red-600 p-4 rounded-xl text-sm font-medium animate-fade-in flex items-center gap-2">
+               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+               {quizError}
+             </div>
+          )}
           <button 
             disabled={selectedOption === null}
             onClick={handleQuizNext}
