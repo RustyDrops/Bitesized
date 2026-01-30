@@ -1,6 +1,6 @@
-
 import React from 'react';
 import { LearningPlan, Depth } from '../types';
+import Badge from './Badge';
 
 interface BadgeScreenProps {
   plan: LearningPlan;
@@ -13,16 +13,11 @@ const BadgeScreen: React.FC<BadgeScreenProps> = ({ plan, onBack, onShare }) => {
     ? `Introductory to ${plan.topic}` 
     : `${plan.topic} Practitioner`;
 
-  const badgeIcon = plan.depth === Depth.OVERVIEW ? "🥉" : "🥈";
-  const badgeColor = plan.depth === Depth.OVERVIEW ? "from-amber-100 to-amber-50" : "from-slate-200 to-slate-50";
-
   return (
     <div className="flex-1 flex flex-col items-center justify-center p-8 bg-white text-center">
       <div className="mb-10 relative">
         <div className="absolute inset-0 bg-blue-100 rounded-full blur-3xl opacity-30 animate-pulse"></div>
-        <div className={`w-40 h-40 bg-gradient-to-br ${badgeColor} rounded-full flex items-center justify-center text-7xl shadow-2xl relative border-4 border-white`}>
-          {badgeIcon}
-        </div>
+        <Badge plan={plan} size="lg" showLabel={false} extraClasses="shadow-2xl border-4" />
         <div className="absolute -bottom-4 left-1/2 -translate-x-1/2 bg-yellow-400 text-yellow-900 text-[10px] font-bold px-4 py-1.5 rounded-full uppercase tracking-widest shadow-lg">
           Mastered
         </div>

@@ -10,6 +10,7 @@ import BiteViewer from './components/BiteViewer';
 import PlanList from './components/PlanList';
 import QuizModule from './components/QuizModule';
 import BadgeScreen from './components/BadgeScreen';
+import Profile from './components/Profile';
 
 const GUEST_USER: User = {
   id: 'guest-user',
@@ -26,7 +27,7 @@ const App: React.FC = () => {
     loadingMessage: '',
   });
 
-  const [view, setView] = useState<'input' | 'generating' | 'dashboard' | 'bite' | 'plans-list' | 'quiz' | 'badge'>('input');
+  const [view, setView] = useState<'input' | 'generating' | 'dashboard' | 'bite' | 'plans-list' | 'quiz' | 'badge' | 'profile'>('input');
   const [activeBiteId, setActiveBiteId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -138,6 +139,7 @@ const App: React.FC = () => {
       user={state.user} 
       onLogout={handleLogout} 
       onHome={() => setView('plans-list')}
+      onProfile={() => setView('profile')}
     >
       {view === 'plans-list' && (
         <PlanList 
@@ -202,6 +204,14 @@ const App: React.FC = () => {
             navigator.clipboard.writeText(text);
             alert("Share summary copied to clipboard!");
           }}
+        />
+      )}
+
+      {view === 'profile' && (
+        <Profile
+          user={state.user}
+          plans={state.plans}
+          onBack={() => setView('plans-list')}
         />
       )}
     </Layout>
