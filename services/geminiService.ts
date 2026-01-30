@@ -21,6 +21,25 @@ export const generateLearningPlan = async (
   mode: LearningMode,
   dailyTime: number
 ): Promise<LearningPlan> => {
+  const cacheKey = `learning_plan_${topic}_${depth}_${mode}_${dailyTime}`;
+
+  if (typeof localStorage !== 'undefined') {
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        return {
+          ...parsed,
+          id: crypto.randomUUID(),
+          createdAt: new Date().toISOString()
+        };
+      } catch (e) {
+        console.warn("Failed to parse cached plan", e);
+        localStorage.removeItem(cacheKey);
+      }
+    }
+  }
+
   const model = "gemini-3-flash-preview";
 
   const prompt = `Generate a structured microlearning plan for the topic: "${topic}".
@@ -163,7 +182,7 @@ export const generateLearningPlan = async (
   const avgBiteTime = 7;
   const bitesPerDay = Math.max(1, Math.min(5, Math.floor(dailyTime / avgBiteTime)));
 
-  return {
+  const plan: LearningPlan = {
     id: crypto.randomUUID(),
     topic: rawJson.topic,
     depth,
@@ -175,6 +194,16 @@ export const generateLearningPlan = async (
     quiz: rawJson.quiz,
     createdAt: new Date().toISOString(),
   };
+
+  if (typeof localStorage !== 'undefined') {
+    try {
+      localStorage.setItem(cacheKey, JSON.stringify(plan));
+    } catch (e) {
+      console.warn("Failed to cache plan", e);
+    }
+  }
+
+  return plan;
 };
 
 export const getLessonAudio = async (text: string): Promise<string | undefined> => {
