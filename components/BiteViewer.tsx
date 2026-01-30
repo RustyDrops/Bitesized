@@ -98,14 +98,10 @@ const BiteViewer: React.FC<BiteViewerProps> = ({ plan, biteId, onBack, onComplet
     setIsPlaying(false);
   };
 
-  const decode = (base64: string) => {
-    const binaryString = atob(base64);
-    const len = binaryString.length;
-    const bytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
-    }
-    return bytes;
+  const decode = async (base64: string) => {
+    const response = await fetch(`data:application/octet-stream;base64,${base64}`);
+    const arrayBuffer = await response.arrayBuffer();
+    return new Uint8Array(arrayBuffer);
   };
 
   const decodeAudioData = async (data: Uint8Array, ctx: AudioContext, sampleRate: number, numChannels: number): Promise<AudioBuffer> => {
@@ -145,7 +141,8 @@ const BiteViewer: React.FC<BiteViewerProps> = ({ plan, biteId, onBack, onComplet
   const playAudio = async (base64Audio: string) => {
     try {
       audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
-      const audioBuffer = await decodeAudioData(decode(base64Audio), audioContextRef.current, 24000, 1);
+      const decodedData = await decode(base64Audio);
+      const audioBuffer = await decodeAudioData(decodedData, audioContextRef.current, 24000, 1);
       const source = audioContextRef.current.createBufferSource();
       source.buffer = audioBuffer;
       source.connect(audioContextRef.current.destination);
