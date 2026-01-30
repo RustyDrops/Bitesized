@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { LearningBite } from '../types';
-import { askBiteQuestion } from '../services/geminiService';
+import { askBiteQuestion, getLessonAudio } from '../services/geminiService';
 
 interface Message {
   role: 'user' | 'ai';
@@ -21,6 +21,8 @@ const BiteChat: React.FC<BiteChatProps> = ({ topic, bite, onClose }) => {
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  const [playingMessageIndex, setPlayingMessageIndex] = useState<number | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
@@ -78,6 +80,62 @@ const BiteChat: React.FC<BiteChatProps> = ({ topic, bite, onClose }) => {
     };
   };
 
+  const decode = (base64: string) => {
+    const binaryString = atob(base64);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    return bytes;
+  };
+
+  const decodeAudioData = async (data: Uint8Array, ctx: AudioContext, sampleRate: number, numChannels: number): Promise<AudioBuffer> => {
+    const dataInt16 = new Int16Array(data.buffer);
+    const frameCount = dataInt16.length / numChannels;
+    const buffer = ctx.createBuffer(numChannels, frameCount, sampleRate);
+    for (let channel = 0; channel < numChannels; channel++) {
+      const channelData = buffer.getChannelData(channel);
+      for (let i = 0; i < frameCount; i++) {
+        channelData[i] = dataInt16[i * numChannels + channel] / 32768.0;
+      }
+    }
+    return buffer;
+  };
+
+  const handleReadMessage = async (index: number, text: string) => {
+    if (playingMessageIndex === index) {
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+        audioContextRef.current = null;
+      }
+      setPlayingMessageIndex(null);
+      return;
+    }
+
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+    }
+
+    setPlayingMessageIndex(index);
+
+    try {
+      const base64Audio = await getLessonAudio(text);
+      if (!base64Audio) { setPlayingMessageIndex(null); return; }
+
+      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)({ sampleRate: 24000 });
+      const audioBuffer = await decodeAudioData(decode(base64Audio), audioContextRef.current, 24000, 1);
+      const source = audioContextRef.current.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(audioContextRef.current.destination);
+      source.onended = () => setPlayingMessageIndex(null);
+      source.start();
+    } catch (e) {
+      console.error("Audio error:", e);
+      setPlayingMessageIndex(null);
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex flex-col justify-end">
       <div className="bg-white rounded-t-3xl h-[80vh] flex flex-col shadow-2xl overflow-hidden animate-slide-up">
@@ -99,12 +157,24 @@ const BiteChat: React.FC<BiteChatProps> = ({ topic, bite, onClose }) => {
         <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
           {messages.map((m, i) => (
             <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-[85%] p-4 rounded-2xl text-sm leading-relaxed shadow-sm ${
+              <div className={`max-w-[85%] p-4 rounded-2xl text-sm leading-relaxed shadow-sm group relative ${
                 m.role === 'user' 
                   ? 'bg-blue-600 text-white rounded-br-none' 
                   : 'bg-white text-slate-800 border border-slate-100 rounded-bl-none'
               }`}>
                 {m.text}
+                {m.role === 'ai' && (
+                  <button
+                    onClick={() => handleReadMessage(i, m.text)}
+                    className={`absolute -bottom-3 -right-3 w-8 h-8 rounded-full shadow border border-slate-100 flex items-center justify-center transition-all ${playingMessageIndex === i ? 'bg-blue-100 text-blue-600' : 'bg-white text-slate-400 opacity-0 group-hover:opacity-100'}`}
+                  >
+                     {playingMessageIndex === i ? (
+                       <svg className="w-4 h-4 animate-pulse" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+                     ) : (
+                       <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                     )}
+                  </button>
+                )}
               </div>
             </div>
           ))}
