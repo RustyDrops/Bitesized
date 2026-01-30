@@ -1,5 +1,5 @@
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { LearningPlan, LearningBite } from '../types';
 import { getLessonAudio } from '../services/geminiService';
 import BiteChat from './BiteChat';
@@ -48,6 +48,10 @@ const BiteViewer: React.FC<BiteViewerProps> = ({ plan, biteId, onBack, onComplet
       }
     };
   }, [biteId, bite?.completed]);
+
+  const explanationParagraphs = useMemo(() => {
+    return bite ? bite.content.explanation.split('\n\n') : [];
+  }, [bite?.content.explanation]);
 
   if (!bite) return null;
 
@@ -184,7 +188,7 @@ const BiteViewer: React.FC<BiteViewerProps> = ({ plan, biteId, onBack, onComplet
           <section className="space-y-4">
             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-widest">Core Insights</h3>
             <div className="text-slate-700 leading-relaxed space-y-4">
-               {bite.content.explanation.split('\n\n').map((para, i) => (<p key={i}>{para}</p>))}
+               {explanationParagraphs.map((para, i) => (<p key={i}>{para}</p>))}
             </div>
           </section>
 
